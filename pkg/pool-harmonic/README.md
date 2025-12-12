@@ -37,6 +37,7 @@ pkg/pool-harmonic/
 │   └── foundry/
 │       ├── HarmonicPool.t.sol           ← full pool tests
 │       ├── HarmonicMath.t.sol           ← pure math tests
+│       ├── FloarRepBinary.t.sol         ← pure float point math test
 │       └── utils/
 │           └── HarmonicPoolDeployer.sol ← deployment helper
 │

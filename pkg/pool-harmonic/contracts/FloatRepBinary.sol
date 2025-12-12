@@ -34,8 +34,7 @@ library FloatRepBinary {
 
     function fromUint(uint256 x) internal pure returns (Float memory f) {
         if (x == 0) return f;	
-        uint256 lz = _leadingZeros(x);
-        int256 exp = int256(255 - lz) - int256(OFFSET);
+        int256 exp = _bit_length(x) - int256(OFFSET);
         uint256 mant = exp<0 ? x << uint256(-exp) : x>>uint256(exp);
         f.mantissa = int64(uint64(mant));
         f.exponent = int16(exp);
@@ -43,25 +42,36 @@ library FloatRepBinary {
 
     function toUint(Float memory f) internal pure returns (uint256) {
         if (f.mantissa == 0) return 0;
-        int256 exp = int256(f.exponent) - int256(OFFSET);
-        if (exp <= 0) return 0;
-        if (exp >= 256) revert("Float overflow");
-        uint256 absMant = f.mantissa < 0 ? uint256(int256(-f.mantissa)) : uint256(int256(f.mantissa));
-        return absMant >> uint256(int256(OFFSET) - exp);
+        require(f.mantissa>0,"negative float cannot be cast to unsigned");
+        int256 bit_length = int256(f.exponent) + int256(OFFSET);
+        require(bit_length<256,"Float overflow");
+        //in fromUint: mant = x<<(-exp) if exp<0 else  x>>exp 
+        //in toUint:   x    = mant>>(-exp) if exp<0 else mant<<(-exp)
+        uint256 mant = uint256(int256(f.mantissa));
+        return f.exponent<0 ? mant >> uint256(int256(-f.exponent)) : mant << uint256(int256(f.exponent));
     }
 
-	// check this code, we should use define _bit_length()
-    function _leadingZeros(uint256 x) private pure returns (uint256 lz) {
-        uint256 t = x;
-        if (t < 1 << 128) { lz += 128; t <<= 128; } 
-        if (t < 1 << 192) { lz += 64;  t <<= 64;  }
-        if (t < 1 << 224) { lz += 32;  t <<= 32;  }
-        if (t < 1 << 240) { lz += 16;  t <<= 16;  }
-        if (t < 1 << 248) { lz += 8;   t <<= 8;   }
-        if (t < 1 << 252) { lz += 4;   t <<= 4;   }
-        if (t < 1 << 254) { lz += 2;   t <<= 2;   }
-        if (t < 1 << 255) lz += 1;
-    }
+	/*
+	## uint256 Representations:
+	- 0: `0x0000000000000000000000000000000000000000000000000000000000000000` (256 zero bits)
+	- 1: `0x0000000000000000000000000000000000000000000000000000000000000001` (only LSB=1)
+	- 2¹²⁸ - 1: `0x00000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF` (high 128 bits zero, low 128 bits one)
+	- 2²⁵⁶ - 1: `0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF` (all 256 bits one)
+	- 2²⁵⁶: overflows 
+	*/  
+    function _bit_length(uint256 x) private pure returns (int256) {
+        int256 msb = 0;
+        // Binary search to find MSB position
+        if (x >= 2**128) { x >>= 128; msb += 128; }
+        if (x >= 2**64)  { x >>= 64;  msb += 64;  }
+        if (x >= 2**32)  { x >>= 32;  msb += 32;  }
+        if (x >= 2**16)  { x >>= 16;  msb += 16;  }
+        if (x >= 2**8)   { x >>= 8;   msb += 8;   }
+        if (x >= 2**4)   { x >>= 4;   msb += 4;   }
+        if (x >= 2**2)   { x >>= 2;   msb += 2;   }
+        if (x >= 2**1)   { msb += 1;              }
+        return msb;
+    }    
 
     // ────────────────────────────── Arithmetic ──────────────────────────────
 

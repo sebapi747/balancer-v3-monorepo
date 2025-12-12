@@ -32,7 +32,7 @@
     "@balancer-labs/v3-interfaces": "workspace:*"
   },
   "devDependencies": {
-    "@balancer-labs/solidity-toolbox": "workspace:*",
+    "@balancer-labs/v3-common": "workspace:*",
     "@balancer-labs/v3-pool-utils": "workspace:*",
     "@balancer-labs/v3-solidity-utils": "workspace:*",
     "@typescript-eslint/eslint-plugin": "^5.41.0",

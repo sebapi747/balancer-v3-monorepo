@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // pkg/pool-harmonic/contracts/HarmonicMath.sol
 pragma solidity ^0.8.24;
 

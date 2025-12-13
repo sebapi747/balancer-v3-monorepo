@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 library FloatRepBinary {
-    uint256 private constant OFFSET = 60;
+    uint256 private constant OFFSET = 52;
     uint256 private constant FACTOR = 1 << OFFSET;
     uint256 private constant SQRT_OFFSET = OFFSET / 2;
 	/*
@@ -20,10 +20,7 @@ library FloatRepBinary {
 	the IEEE754 precision given chmm fees are much larger than the 1.54e-16 relative
 	precision of float64 mantissa.
 	
-	If we get desperate, we might switch to int32 mantissa and exponent which would require to test
-	precision as we get a theoretical 2.3e-10 mantissa precision (probably still ok compared to >1e-4 txn cost)
-	or packing/unpacking of an int64 into an int53 mantissa and int11 exponent which requires much 
-	shifting and temp variable allocation.
+	another very exciting possibility is to use a packed int128 to store the mantissa and exponent
 	*/
     struct Float {
         int64 mantissa;
@@ -31,11 +28,10 @@ library FloatRepBinary {
     }
 
     // ────────────────────────────── Conversion ──────────────────────────────
-
     function fromUint(uint256 x) internal pure returns (Float memory f) {
         if (x == 0) return f;	
-        int256 exp = _bit_length(x) - int256(OFFSET);
-        uint256 mant = exp<0 ? x << uint256(-exp) : x>>uint256(exp);
+        int256  exp = _bit_length(x) - int256(OFFSET);
+        uint256 mant = exp>=0 ? x>>uint256(exp) : x << uint256(-exp);
         f.mantissa = int64(uint64(mant));
         f.exponent = int16(exp);
     }
@@ -43,12 +39,8 @@ library FloatRepBinary {
     function toUint(Float memory f) internal pure returns (uint256) {
         if (f.mantissa == 0) return 0;
         require(f.mantissa>0,"negative float cannot be cast to unsigned");
-        int256 bit_length = int256(f.exponent) + int256(OFFSET);
-        require(bit_length<256,"Float overflow");
-        //in fromUint: mant = x<<(-exp) if exp<0 else  x>>exp 
-        //in toUint:   x    = mant>>(-exp) if exp<0 else mant<<(-exp)
-        uint256 mant = uint256(int256(f.mantissa));
-        return f.exponent<0 ? mant >> uint256(int256(-f.exponent)) : mant << uint256(int256(f.exponent));
+        uint256 mant = uint256(uint64(f.mantissa));
+        return f.exponent>=0 ? mant<<uint256(int256(f.exponent)) : mant>>uint256(int256(-f.exponent));
     }
 
 	/*
@@ -60,6 +52,7 @@ library FloatRepBinary {
 	- 2²⁵⁶: overflows 
 	*/  
     function _bit_length(uint256 x) private pure returns (int256) {
+    	if (x == 0) return 0; // optimisation 
         int256 msb = 0;
         // Binary search to find MSB position
         if (x >= 2**128) { x >>= 128; msb += 128; }

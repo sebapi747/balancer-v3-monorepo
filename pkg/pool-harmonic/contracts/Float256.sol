@@ -71,17 +71,17 @@ library Float256Math {
     }
 
     /// @dev Convert Float256 → uint256 (rounds down)
-    function toUint(Float256 f) internal pure returns (uint256 result) {
+    function toUint(Float256 f) internal pure returns (uint256 r) {
         uint256 x = Float256.unwrap(f);
         if (x == 0) return 0;
     	bool sign = (x &MASK_SIGN) != 0;
         require(!sign, "negative float cannot be converted to uint256");
     	uint256 biasedexp   = (x & MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	if (biasedexp==0) return 0;
     	uint256 significand =  x & MASK_SIGNIFICAND; 
-        uint256 value = biasedexp>=EXPONENT_BIAS 
+        r = biasedexp>=EXPONENT_BIAS 
         	? significand<<(biasedexp-EXPONENT_BIAS) 
         	: significand>>(EXPONENT_BIAS-biasedexp);
-        return value;
     }
 
     /// @dev Fast MSB for uint256 — 62–68 gas, optimal in 2025
@@ -97,19 +97,19 @@ library Float256Math {
         if (x >= 1 << 1)             r |= 1;
     }
 
-    function mul(Float256 ax, Float256 bx) internal pure returns (Float256 c) {
+    function mul(Float256 ax, Float256 bx) internal pure returns (Float256) {
     	uint256 a = Float256.unwrap(ax);
     	uint256 b = Float256.unwrap(bx);
     	if (a == 0 || b == 0) return Float256.wrap(0);
-    	uint256 abiasedexp   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	uint256 bbiasedexp   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	int256  asignificand; int256  bsignificand; 
-		assembly {asignificand := and(a, MASK_SIGNED_SIGNIFICAND) bsignificand := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	int256  as; int256  bs; 
+		assembly {as := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
     	// actual operation starts
-        int256  csignificand = (asignificand * bsignificand) >> SIGNIFICAND_SCALE;
-    	uint256 cbiasedexp   = abiasedexp + bbiasedexp + SIGNIFICAND_SCALE;
-    	cbiasedexp = cbiasedexp>EXPONENT_BIAS ? cbiasedexp-EXPONENT_BIAS : 0;
-    	require(cbiasedexp<=2046,"exponent overflow");
+        int256  cs = (as * bs) >> SIGNIFICAND_SCALE;
+    	uint256 ce = ae + be+ SIGNIFICAND_SCALE;
+    	ce = ce>EXPONENT_BIAS ? ce-EXPONENT_BIAS : 0;
+    	require(ce<=2046,"exponent overflow");
     	// actual operation ends
     	uint256 packed; assembly {packed := or(csignificand,shl(EXPONENT_SHIFT, cbiasedexp))} 
     	return Float256.wrap(packed);

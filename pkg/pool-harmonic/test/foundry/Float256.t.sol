@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
 import { Test } from "forge-std/Test.sol";
@@ -42,17 +42,16 @@ contract Float256Test is Test {
         assertEq(f.toUint(), 1 << 100);
     }
 
-	// Helper to check relative error <= ~1 ulp
-    function assertApproxEqUint(uint256 a, uint256 b, string memory err) internal pure {
+	// Helper to check relative error abs(a-b).2^52-1 <= x for  ~1 ulp
+    function assertApproxEqUint(uint256 a, uint256 b, uint256 x, string memory err) internal pure {
         uint256 diff = a > b ? a - b : b - a;
-        // Allow diff << 52 <= expected + 1
-        assertLe(diff << 52 -1, b, err);
+        assertLe(diff << 52 -1, x, err); // Allow abs(a-b).2^52-1 <= x 
     }
     
     function testRoundTrip(uint256 x) public pure {
         Float256 f = Float256Math.fromUint(x);
         uint256 back = f.toUint();
-        assertApproxEqUint(x,back,"testRoundTrip");
+        assertApproxEqUint(x,back,back,"testRoundTrip");
     }
     
     function testMul() public pure {
@@ -68,15 +67,34 @@ contract Float256Test is Test {
 			}
 		}
     }
-    
+   
+	function testAddFuzz(uint256 x, uint256 y) public pure{
+        vm.assume(x < (1 << 254));
+        vm.assume(y < (1 << 254));
+        Float256 fx = Float256Math.fromUint(x);
+        Float256 fy = Float256Math.fromUint(y);
+        Float256 result = fx.add(fy);
+        assertApproxEqUint(result.toUint(), x + y,x+y, "add fuzz precision");
+    } 
+	function testSubFuzz(uint256 x, uint256 y) public pure{
+        vm.assume(x < (1 << 254));
+        vm.assume(y < (1 << 254));
+        vm.assume(x>=y);
+        Float256 fx = Float256Math.fromUint(x);
+        Float256 fy = Float256Math.fromUint(y);
+        Float256 xmy = fx.sub(fy);
+        assertApproxEqUint(x-y, xmy.toUint(), x, "sub fuzz relative precision");
+        args=[12278727581453662187023, 11092866023091651188199 ]; // [1.227e22,1.109e22]
+        Float256 zero = xmy.add(fy.sub(fx));
+        assertEq(fx.add(zero).toUint(), x); //, x, "x+((x-y)+(y-x))= x");
+    } 
 	function testMulFuzz(uint256 x, uint256 y) public pure{
-        // Bound to avoid immediate overflow revert in expectation (but let mul handle it)
         vm.assume(x < (1 << 240));
         vm.assume(y < (1 << 16));
         Float256 fx = Float256Math.fromUint(x);
         Float256 fy = Float256Math.fromUint(y);
-        uint256 expected = x * y; // may overflow uint256 — that's ok, we compare approx
+        uint256 expected = x * y; 
         uint256 result = fx.mul(fy).toUint();
-        assertApproxEqUint(result, expected, "mul fuzz precision");
+        assertApproxEqUint(result, expected, expected, "mul fuzz precision");
     }
 }

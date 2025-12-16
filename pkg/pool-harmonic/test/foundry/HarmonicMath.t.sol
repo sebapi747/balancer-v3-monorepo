@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 // pkg/pool-harmonic/test/foundry/HarmonicMath.t.sol
 pragma solidity ^0.8.24;
 

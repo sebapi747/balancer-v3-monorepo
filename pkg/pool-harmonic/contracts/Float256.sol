@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
 /// @title Float — double precision packed into uint256
@@ -102,15 +102,62 @@ library Float256Math {
         if (x >= 1 << 1)             r |= 1;
     }
 
+    // ────────────────────────────── Arithmetic ──────────────────────────────
+    
+    function add(Float256 ax, Float256 bx) internal pure returns (Float256) {
+    	uint256 a = Float256.unwrap(ax);
+    	uint256 b = Float256.unwrap(bx);
+    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	int256  asig; int256  bs; 
+		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	// actual operation starts
+    	int256 cs; uint256 ce;
+    	unchecked {
+			if (ae>=be) {
+				cs = asig + (bs >> (ae - be));
+				ce = ae;
+			} else {
+				cs = bs + (asig >> (be - ae));
+				ce = be;
+			}
+			// gas golfing: to be more robust, we should renormalize in case the addition carried up cs to an additional bit
+    	}
+    	// actual operation ends
+    	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 
+    	return Float256.wrap(packed);
+    }
+    
+    function sub(Float256 ax, Float256 bx) internal pure returns (Float256) {
+        uint256 a = Float256.unwrap(ax);
+    	uint256 b = Float256.unwrap(bx);
+    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	int256  asig; int256  bs; 
+		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	// actual operation starts
+    	int256 cs; uint256 ce;
+    	unchecked {
+        	if (ae <= be) {
+            	cs = (asig >> (be-ae)) - bs;
+            	ce = be;
+        	} else {
+            	cs = asig - (bs >> (ae-be));
+            	ce = ae;
+        	}
+        	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
+    	}
+    	// actual operation ends
+    	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 
+    	return Float256.wrap(packed);
+    }
+    
     function mul(Float256 ax, Float256 bx) internal pure returns (Float256) {
     	uint256 a = Float256.unwrap(ax);
     	uint256 b = Float256.unwrap(bx);
     	if (a == 0 || b == 0) return Float256.wrap(0);
-    	uint256 ae; uint256 be; 
-    	unchecked {
-    	ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	}
+    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
     	int256  asig; int256  bs; 
 		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
     	// actual operation starts
@@ -120,6 +167,7 @@ library Float256Math {
     		ce = ae + be+ SIGNIFICAND_SCALE;
     		ce = ce>EXPONENT_BIAS ? ce-EXPONENT_BIAS : 0;
     	}
+    	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
     	// actual operation ends
     	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 

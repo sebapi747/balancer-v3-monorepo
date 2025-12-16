@@ -1,5 +1,5 @@
+// SPDX-License-Identifier: BUSL-1.1
 // pkg/pool-harmonic/test/foundry/HarmonicPool.t.sol
-// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "@balancer-labs/v3-interfaces/contracts/vault/IVault.sol";

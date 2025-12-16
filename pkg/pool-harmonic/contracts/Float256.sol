@@ -47,16 +47,16 @@ library Float256Math {
 	- Multiplication of significands (53 × 53 → 106 bits) fits safely in uint256
 	*/
 	uint256 private constant SIGN_BIT_POS = 255;
-	uint256 private constant EXPONENT_BITS = 11;
-	uint256 private constant EXPONENT_SHIFT = 244; // bits 254–244
-	uint256 private constant EXPONENT_BIAS = 1023;
-	uint256 private constant MASK_SIGN      = 1 << SIGN_BIT_POS;                    // bit 255
-	uint256 private constant MASK_EXPONENT  = 0x7ff0000000000000000000000000000000000000000000000000000000000000;
-	uint256 private constant MASK_SIGNED_SIGNIFICAND = 0x800fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+	uint256 public constant EXPONENT_BITS = 11;
+	uint256 public constant EXPONENT_SHIFT = 244; // bits 254–244
+	uint256 public constant EXPONENT_BIAS = 1023;
+	uint256 public constant MASK_SIGN      = 1 << SIGN_BIT_POS;                    // bit 255
+	uint256 public constant MASK_EXPONENT  = 0x7ff0000000000000000000000000000000000000000000000000000000000000;
+	uint256 public constant MASK_SIGNED_SIGNIFICAND = 0x800fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 	//uint256 private constant MASK_EXPONENT  = ((1 << EXPONENT_BITS) - 1) << EXPONENT_SHIFT;
 	//uint256 private constant MASK_SIGNED_SIGNIFICAND = ~MASK_EXPONENT;       // only exclude exponent
-	uint256 private constant MASK_SIGNIFICAND = ~MASK_EXPONENT & ~MASK_SIGN; // bits 243–0, excluding sign
-	uint256 private constant SIGNIFICAND_SCALE = 52; // significand normalization shift
+	uint256 public constant MASK_SIGNIFICAND = ~MASK_EXPONENT & ~MASK_SIGN; // bits 243–0, excluding sign
+	uint256 public constant SIGNIFICAND_SCALE = 52; // significand normalization shift
 	
     /// @dev Convert uint256 → Float256 (rounds to nearest, ties to even)
     function fromUint(uint256 x) internal pure returns (Float256) {
@@ -102,6 +102,31 @@ library Float256Math {
         if (x >= 1 << 1)             r |= 1;
     }
 
+	/* 
+	   There are 2 possible packing choice given than 13=0b000...00001101
+	   a) store sign bit + unisgned significand 
+	      13=0b00....00001101, -13=0b10....00001101
+	      -x = only flip bit sign of x
+	      use unsigned arithmetic for mantissa => + calls - if signs differ
+	   b) store signed int significand -> use signed int arithmetic for mantissa
+	      13=0b00....00001101, -13=0b11...11110011 
+	      4=0b00000100, -4=0b11111100
+	      (in this case, encoding flips signs on the left, until the rightmost 1)
+	      use signed arithmetic for mantissa => simpler code
+	   In the following code, I try using b)
+	   */ 
+	// significand is an int-13 = 11110011
+    function significand(uint256 packed) internal pure returns (int256 sig) {
+    	assembly {
+    		sig := and(packed, MASK_SIGNED_SIGNIFICAND)
+			if lt(sig, 0) {
+    			sig := or(sig, MASK_EXPONENT) 
+			}
+		}
+    }
+    function pack(int256 cs, uint256 ce) internal pure returns (uint256 packed) {
+    	assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
+    }
     // ────────────────────────────── Arithmetic ──────────────────────────────
     
     function add(Float256 ax, Float256 bx) internal pure returns (Float256) {
@@ -109,22 +134,18 @@ library Float256Math {
     	uint256 b = Float256.unwrap(bx);
     	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
     	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	int256  asig; int256  bs; 
-		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	int256  asig = significand(a);
+    	int256  bs   = significand(b); 
     	// actual operation starts
     	int256 cs; uint256 ce;
+    	if (be>ae) (asig, ae, bs, be) = (bs, be, asig, ae);
     	unchecked {
-			if (ae>=be) {
-				cs = asig + (bs >> (ae - be));
-				ce = ae;
-			} else {
-				cs = bs + (asig >> (be - ae));
-				ce = be;
-			}
+			cs = asig + (bs >> (ae - be));
+			ce = ae;
 			// gas golfing: to be more robust, we should renormalize in case the addition carried up cs to an additional bit
     	}
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
     	return Float256.wrap(packed);
     }
     
@@ -133,8 +154,8 @@ library Float256Math {
     	uint256 b = Float256.unwrap(bx);
     	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
     	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	int256  asig; int256  bs; 
-		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	int256  asig = significand(a);
+    	int256  bs   = significand(b); 
     	// actual operation starts
     	int256 cs; uint256 ce;
     	unchecked {
@@ -148,7 +169,7 @@ library Float256Math {
         	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
     	}
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
     	return Float256.wrap(packed);
     }
     
@@ -158,8 +179,8 @@ library Float256Math {
     	if (a == 0 || b == 0) return Float256.wrap(0);
     	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
     	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	int256  asig; int256  bs; 
-		assembly {asig := and(a, MASK_SIGNED_SIGNIFICAND) bs := and(b, MASK_SIGNED_SIGNIFICAND)}
+    	int256  asig = significand(a);
+    	int256  bs = significand(b); 
     	// actual operation starts
     	int256 cs; uint256 ce;
     	unchecked {
@@ -170,7 +191,7 @@ library Float256Math {
     	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(cs,shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
     	return Float256.wrap(packed);
     }
 }

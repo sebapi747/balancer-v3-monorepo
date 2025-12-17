@@ -228,4 +228,41 @@ library Float256Math {
     	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);
     }
+    
+	// ────────────────────────────── Power & Root ──────────────────────────────
+    function pow(Float256 a, uint256 p) internal pure returns (Float256 c) {
+        if (p == 1) return a;
+        if (p == 2) return mul(a, a);
+        if (p == 4) { Float256 sq = mul(a, a); return mul(sq, sq); }
+        revert("unsupported pow");
+    }
+    
+    function sqrtInt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        //uint256 z = (x + 1) >> 1; 
+        uint256 z = 1 << ((_msb(x)+1) >> 1); // better educated guess
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) >> 1;
+        }
+        return y;
+    }
+    
+    function root(Float256 a, uint256 p) internal pure returns (Float256 c) {
+        if (p == 1) return a;
+        if (p == 4) return root(root(a, 2), 2);
+        require(p==2,"p must be 1,2 or 4");
+        uint256 m = uint256(signficand(a));
+        uint256 exp = int256(exponent(a))-int256(EXPONENT_BIAS);
+		if (exp % 2 == 1) {
+			m = m << 1;
+			exp = exp-1;
+		}
+		int256 SQRT_OFFSET = SIGNIFICAND_SCALE/2;
+        m   = sqrtInt(m) << SQRT_OFFSET;
+        exp = (exp >> 1) - SQRT_OFFSET + EXPONENT_BIAS;
+        uint256 packed = pack(uint256(m),uint256(exp));
+    	return Float256.wrap(packed);
+    }
 }

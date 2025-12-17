@@ -57,7 +57,7 @@ library Float256Math {
 	//uint256 private constant MASK_EXPONENT  = ((1 << EXPONENT_BITS) - 1) << EXPONENT_SHIFT;
 	//uint256 private constant MASK_SIGNED_SIGNIFICAND = ~MASK_EXPONENT;       // only exclude exponent
 	uint256 public constant MASK_SIGNIFICAND = ~MASK_EXPONENT & ~MASK_SIGN; // bits 243–0, excluding sign
-	uint256 public constant SIGNIFICAND_SCALE = 52; // significand normalization shift
+	uint256 public constant SIGNIFICAND_SCALE = 80; // significand normalization shift
 	
     /// @dev Convert uint256 → Float256 (rounds to nearest, ties to even)
     function fromUint(uint256 x) internal pure returns (Float256) {

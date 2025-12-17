@@ -78,15 +78,15 @@ contract Float256Test is Test {
     }
 
 	// Helper to check relative error abs(a-b).2^52-1 <= x for  ~1 ulp
-    function assertApproxEqUint(uint256 a, uint256 b, uint256 x, string memory err) internal pure {
+    function assertApproxEqUint(uint256 a, uint256 b, uint256 x, uint256 tolerance, string memory err) internal pure {
         uint256 diff = a > b ? a - b : b - a;
-        assertLe(diff << Float256Math.SIGNIFICAND_SCALE -1, x, err); // Allow abs(a-b).2^52-1 <= x 
+        assertLe(diff << (Float256Math.SIGNIFICAND_SCALE-tolerance) -1, x, err); // Allow abs(a-b).2^52-1 <= x 
     }
     
     function testRoundTrip(uint256 x) public pure {
         Float256 f = Float256Math.fromUint(x);
         uint256 back = f.toUint();
-        assertApproxEqUint(x,back,back,"testRoundTrip");
+        assertApproxEqUint(x,back,back,0,"testRoundTrip");
     }
     
     function testMul() public pure {
@@ -95,6 +95,7 @@ contract Float256Test is Test {
         Float256 z = x;
         uint256 zint = 1564513*3;
 	    assertEq(x.mul(y).toUint(),zint);
+	    // gas test for kflops
         for (uint256 i = 0; i < 10; i++) {
         	x = z;
         	for (uint256 j= 0; j < 100; j++) {
@@ -109,7 +110,7 @@ contract Float256Test is Test {
         Float256 fx = Float256Math.fromUint(x);
         Float256 fy = Float256Math.fromUint(y);
         Float256 result = fx.add(fy);
-        assertApproxEqUint(result.toUint(), x + y,x+y, "add fuzz precision");
+        assertApproxEqUint(result.toUint(), x + y,x+y,0, "add fuzz precision");
     } 
 	function testSubFuzz(uint256 x, uint256 y) public pure{
         vm.assume(x < (1 << 254));
@@ -118,7 +119,7 @@ contract Float256Test is Test {
         Float256 fx = Float256Math.fromUint(x);
         Float256 fy = Float256Math.fromUint(y);
         Float256 xmy = fx.sub(fy);
-        assertApproxEqUint(x-y, xmy.toUint(), x, "sub fuzz relative precision");
+        assertApproxEqUint(x-y, xmy.toUint(), x,0, "sub fuzz relative precision");
         Float256 ymx = fy.sub(fx);
         Float256 zero = ymx.add(xmy);
         assertEq(zero.toUint(),0);
@@ -132,6 +133,21 @@ contract Float256Test is Test {
         Float256 fy = Float256Math.fromUint(y);
         uint256 expected = x * y; 
         uint256 result = fx.mul(fy).toUint();
-        assertApproxEqUint(result, expected, expected, "mul fuzz precision");
+        assertApproxEqUint(result, expected, expected,0, "mul fuzz precision");
+    }
+  
+	function testDivExamples() public pure{
+		uint256 a = 51; uint256 b = 3;
+        assertEq(Float256Math.fromUint(a*b).div(Float256Math.fromUint(b)).toUint(), a);
+        a = 3546347; b = 4325636;
+        assertEq(Float256Math.fromUint(a*b).div(Float256Math.fromUint(b)).toUint(), a);
+    }
+      
+	function testDivFuzz(uint256 x, uint256 y) public pure{
+        vm.assume(x < (1 << 52));
+        vm.assume(y < (1 << 52));
+        vm.assume(y > 0);
+        uint256 result = Float256Math.fromUint(x*y).div(Float256Math.fromUint(y)).toUint();
+        assertApproxEqAbs(result, x, 1);
     }
 }

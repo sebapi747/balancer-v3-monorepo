@@ -103,8 +103,10 @@ library Float256Math {
         if (x >= 1 << 1)             r |= 1;
     }
 
+    // ────────────────────────────── Packing ──────────────────────────────
 	/* 
-	   There are 2 possible packing choice given than 13=0b000...00001101
+	   There are 2 possible packing choice given positive nb 13=0b000...00001101
+	   depending if we want to use unsigned arithmetic
 	   a) store sign bit + unisgned significand 
 	      13=0b00....00001101, -13=0b10....00001101
 	      -x = only flip bit sign of x
@@ -131,6 +133,7 @@ library Float256Math {
     function pack(int256 cs, uint256 ce) internal pure returns (uint256 packed) {
     	assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
     }
+    
     // ────────────────────────────── Arithmetic ──────────────────────────────
     
     function add(Float256 ax, Float256 bx) internal pure returns (Float256) {
@@ -194,6 +197,33 @@ library Float256Math {
     	}
     	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
+       	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
+    	// actual operation ends
+    	uint256 packed = pack(cs,ce);
+    	return Float256.wrap(packed);
+    }
+    
+    function div(Float256 ax, Float256 bx) internal pure returns (Float256) {
+    	uint256 a = Float256.unwrap(ax);
+    	uint256 b = Float256.unwrap(bx);
+    	if (a == 0) return Float256.wrap(0);
+    	int256  asig = significand(a);
+    	int256  bs = significand(b); 
+    	require(bs!=0, "significand must be non 0");
+    	uint256 ae   = exponent(a);
+    	uint256 be   = exponent(b);
+    	// actual operation starts
+    	int256 cs; uint256 ce;
+    	uint256 posexp; uint256 negexp;
+    	unchecked {
+        	cs = (asig << SIGNIFICAND_SCALE)/bs;
+        	posexp = EXPONENT_BIAS+ae;
+        	negexp = SIGNIFICAND_SCALE+be;
+    		ce = posexp>negexp ? posexp-negexp : 0;
+    	}
+    	if (ce == 0) return Float256.wrap(0);
+    	require(ce<=2046,"exponent overflow");
+       	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
     	// actual operation ends
     	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);

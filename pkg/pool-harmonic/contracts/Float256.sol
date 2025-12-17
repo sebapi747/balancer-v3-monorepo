@@ -197,7 +197,7 @@ library Float256Math {
     	}
     	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
-       	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
+       	// gas golfing: to be more robust, we should renormalize in case the mult increased exponent
     	// actual operation ends
     	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);
@@ -223,7 +223,7 @@ library Float256Math {
     	}
     	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
-       	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
+       	// gas golfing: to be more robust, we should renormalize in case the div reduced exponent
     	// actual operation ends
     	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);

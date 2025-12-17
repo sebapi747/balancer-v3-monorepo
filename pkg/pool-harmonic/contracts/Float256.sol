@@ -63,14 +63,14 @@ library Float256Math {
     function fromUint(uint256 x) internal pure returns (Float256) {
     	if (x==0) return Float256.wrap(0);
     	uint256 msb = _msb(x); 
-    	uint256 significand; uint256 exponent;
+    	uint256 sig; uint256 exp;
     	unchecked {
-    		significand = msb>SIGNIFICAND_SCALE 
+    		sig = msb>SIGNIFICAND_SCALE 
     			? x>>(msb-SIGNIFICAND_SCALE) 
     			: x<<(SIGNIFICAND_SCALE-msb);
-    		exponent = (msb+(EXPONENT_BIAS-SIGNIFICAND_SCALE))<<EXPONENT_SHIFT; 
+    		exp = (msb+(EXPONENT_BIAS-SIGNIFICAND_SCALE))<<EXPONENT_SHIFT; 
     	}
-    	uint256 value = significand | exponent;
+    	uint256 value = sig | exp;
         return Float256.wrap(value);
     }
 
@@ -82,11 +82,11 @@ library Float256Math {
         require(!sign, "negative float cannot be converted to uint256");
         uint256 biasedexp = (x & MASK_EXPONENT) >> EXPONENT_SHIFT;
     	if (biasedexp==0) return 0;
-    	uint256 significand =  x & MASK_SIGNIFICAND; 
+    	uint256 sig =  x & MASK_SIGNIFICAND; 
     	unchecked {
         r = biasedexp>=EXPONENT_BIAS 
-        	? significand<<(biasedexp-EXPONENT_BIAS) 
-        	: significand>>(EXPONENT_BIAS-biasedexp);
+        	? sig<<(biasedexp-EXPONENT_BIAS) 
+        	: sig>>(EXPONENT_BIAS-biasedexp);
         }
     }
 
@@ -249,20 +249,21 @@ library Float256Math {
         return y;
     }
     
-    function root(Float256 a, uint256 p) internal pure returns (Float256 c) {
-        if (p == 1) return a;
-        if (p == 4) return root(root(a, 2), 2);
+    function root(Float256 ax, uint256 p) internal pure returns (Float256 c) {
+        if (p == 1) return ax;
+        if (p == 4) return root(root(ax, 2), 2);
         require(p==2,"p must be 1,2 or 4");
-        uint256 m = uint256(signficand(a));
-        uint256 exp = int256(exponent(a))-int256(EXPONENT_BIAS);
+        uint256 a = Float256.unwrap(ax);
+        uint256 m = uint256(significand(a));
+        int256  exp = int256(exponent(a))-int256(EXPONENT_BIAS);
 		if (exp % 2 == 1) {
 			m = m << 1;
 			exp = exp-1;
 		}
-		int256 SQRT_OFFSET = SIGNIFICAND_SCALE/2;
+		uint256 SQRT_OFFSET = SIGNIFICAND_SCALE/2;
         m   = sqrtInt(m) << SQRT_OFFSET;
-        exp = (exp >> 1) - SQRT_OFFSET + EXPONENT_BIAS;
-        uint256 packed = pack(uint256(m),uint256(exp));
+        exp = (exp >> 1) - int256(SQRT_OFFSET) + int256(EXPONENT_BIAS);
+        uint256 packed = pack(int256(m),uint256(exp));
     	return Float256.wrap(packed);
     }
 }

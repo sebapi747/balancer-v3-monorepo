@@ -50,9 +50,10 @@ library Float256Math {
 	uint256 public constant EXPONENT_BITS = 11;
 	uint256 public constant EXPONENT_SHIFT = 244; // bits 254–244
 	uint256 public constant EXPONENT_BIAS = 1023;
-	uint256 public constant MASK_SIGN      = 1 << SIGN_BIT_POS;                    // bit 255
+	uint256 public constant MASK_SIGN      = 0x8000000000000000000000000000000000000000000000000000000000000000; 
 	uint256 public constant MASK_EXPONENT  = 0x7ff0000000000000000000000000000000000000000000000000000000000000;
 	uint256 public constant MASK_SIGNED_SIGNIFICAND = 0x800fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+	//uint256 public constant MASK_SIGN  = 1 << SIGN_BIT_POS;                    // bit 255
 	//uint256 private constant MASK_EXPONENT  = ((1 << EXPONENT_BITS) - 1) << EXPONENT_SHIFT;
 	//uint256 private constant MASK_SIGNED_SIGNIFICAND = ~MASK_EXPONENT;       // only exclude exponent
 	uint256 public constant MASK_SIGNIFICAND = ~MASK_EXPONENT & ~MASK_SIGN; // bits 243–0, excluding sign
@@ -119,10 +120,13 @@ library Float256Math {
     function significand(uint256 packed) internal pure returns (int256 sig) {
     	assembly {
     		sig := and(packed, MASK_SIGNED_SIGNIFICAND)
-			if lt(sig, 0) {
+			if and(packed,MASK_SIGN) { 
     			sig := or(sig, MASK_EXPONENT) 
 			}
 		}
+    }
+    function exponent(uint256 packed) internal pure returns (uint256 exp) {
+    	exp = (packed&MASK_EXPONENT) >> EXPONENT_SHIFT;
     }
     function pack(int256 cs, uint256 ce) internal pure returns (uint256 packed) {
     	assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
@@ -132,8 +136,8 @@ library Float256Math {
     function add(Float256 ax, Float256 bx) internal pure returns (Float256) {
     	uint256 a = Float256.unwrap(ax);
     	uint256 b = Float256.unwrap(bx);
-    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 ae   = exponent(a);
+    	uint256 be   = exponent(b);
     	int256  asig = significand(a);
     	int256  bs   = significand(b); 
     	// actual operation starts
@@ -145,15 +149,15 @@ library Float256Math {
 			// gas golfing: to be more robust, we should renormalize in case the addition carried up cs to an additional bit
     	}
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);
     }
     
     function sub(Float256 ax, Float256 bx) internal pure returns (Float256) {
         uint256 a = Float256.unwrap(ax);
     	uint256 b = Float256.unwrap(bx);
-    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 ae   = exponent(a);
+    	uint256 be   = exponent(b);
     	int256  asig = significand(a);
     	int256  bs   = significand(b); 
     	// actual operation starts
@@ -169,7 +173,7 @@ library Float256Math {
         	// gas golfing: to be more robust, we should renormalize in case the substraction reduced exponent
     	}
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);
     }
     
@@ -177,8 +181,8 @@ library Float256Math {
     	uint256 a = Float256.unwrap(ax);
     	uint256 b = Float256.unwrap(bx);
     	if (a == 0 || b == 0) return Float256.wrap(0);
-    	uint256 ae   = (a&MASK_EXPONENT) >> EXPONENT_SHIFT;
-    	uint256 be   = (b&MASK_EXPONENT) >> EXPONENT_SHIFT;
+    	uint256 ae   = exponent(a);
+    	uint256 be   = exponent(b);
     	int256  asig = significand(a);
     	int256  bs = significand(b); 
     	// actual operation starts
@@ -191,7 +195,7 @@ library Float256Math {
     	if (ce == 0) return Float256.wrap(0);
     	require(ce<=2046,"exponent overflow");
     	// actual operation ends
-    	uint256 packed; assembly {packed := or(and(cs,MASK_SIGNED_SIGNIFICAND), shl(EXPONENT_SHIFT, ce))} 
+    	uint256 packed = pack(cs,ce);
     	return Float256.wrap(packed);
     }
 }

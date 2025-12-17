@@ -123,42 +123,7 @@ contract Float256Test is Test {
         Float256 zero = ymx.add(xmy);
         assertEq(zero.toUint(),0);
         assertEq(xmy.add(ymx).toUint(),0);
-        /*
-        x = 13;
-        fx = Float256Math.fromUint(x);
-        Float256 mx   = Float256Math.fromUint(0).sub(fx);
-        Float256 zero = fx.add(mx);
-        debugUint256Bits("x:", Float256.unwrap(fx));
-        debugUint256Bits("-x:", Float256.unwrap(mx));
-        debugUint256Bits("x+(-x):", Float256.unwrap(zero));
-        uint256 a = Float256.unwrap(fx);
-    	uint256 b = Float256.unwrap(mx);
-    	uint256 ae   = Float256Math.exponent(a);
-    	uint256 be   = Float256Math.exponent(b);
-    	int256  asig = Float256Math.significand(a);
-    	int256  bs   = Float256Math.significand(b); 
-    	// actual operation starts
-    	int256 cs; uint256 ce;
-    	if (be>ae) (asig, ae, bs, be) = (bs, be, asig, ae);
-    	unchecked {
-			cs = asig + (bs >> (ae - be));
-			ce = ae;
-			// gas golfing: to be more robust, we should renormalize in case the addition carried up cs to an additional bit
-    	}
-    	// actual operation ends
-    	uint256 packed = Float256Math.pack(cs,ce);
-    	console.log("ae:       ", ae); 
-    	console.log("as:       ", asig); 
-    	console.log("be:       ", be); 
-    	console.log("bs:       ", bs); 
-    	console.log("ce:       ", ce); 
-    	console.log("cs:       ", cs); 
-    	console.log("packed:       ", packed); 
-        debugUint256Bits("packed:", packed);
-        //console.log("x+zero:", vm.toString(Float256.unwrap(fx.add(zero))));
-        //console.log("x:", vm.toString(Float256.unwrap(fx)));
-        //assertApproxEqUint(fx.add(zero).toUint(), x, x, "x+((x-y)+(y-x))= x");
-        assertEq(ce,be+1);*/
+
     } 
 	function testMulFuzz(uint256 x, uint256 y) public pure{
         vm.assume(x < (1 << 240));

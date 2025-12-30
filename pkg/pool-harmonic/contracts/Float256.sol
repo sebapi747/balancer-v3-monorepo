@@ -11,9 +11,10 @@ library Float256Math {
 	IEEE 754 normal encoding is as follow:
 		value = (-1)^sign x (1+Fraction/2^52) x 2^(exponent-1023)
 		
-	The format provides exactly the same precision (53-bit significand, ≈15–16 decimal digits)
-	and effectively the same dynamic range as IEEE 754 binary64 (double precision),
-	but uses a non-standard layout optimized for EVM integer and bitwise operations.
+	The format provides the same or more precision (53-bit significand, ≈15–16 decimal digits)
+	for any SIGNIFICAND_SCALE>=52 and effectively the same dynamic range as IEEE 754 binary64 
+	(double precision),	but uses a non-standard layout optimized for EVM integer and bitwise 
+	operations.
 	
 	Encoded value is stored in a single int256/uint256 with the following bit layout:
 	
@@ -23,7 +24,7 @@ library Float256Math {
                     	(in practice, only the upper ≈53 bits are ever used)
 	
 	Representation:
-    	value = (-1)^sign × significand × 2^(exponent − 1023 − 52)
+    	value = (-1)^sign × significand × 2^(exponent − 1023 − SIGNIFICAND_SCALE)
 	
 	The significand is a 53-bit integer in the range:
 	- 0                  for zero

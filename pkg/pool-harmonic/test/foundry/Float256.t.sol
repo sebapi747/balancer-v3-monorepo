@@ -95,13 +95,6 @@ contract Float256Test is Test {
         Float256 z = x;
         uint256 zint = 1564513*3;
 	    assertEq(x.mul(y).toUint(),zint);
-	    // gas test for kflops
-        for (uint256 i = 0; i < 10; i++) {
-        	x = z;
-        	for (uint256 j= 0; j < 100; j++) {
-        		x = x.mul(y);
-			}
-		}
     }
    
 	function testAddFuzz(uint256 x, uint256 y) public pure{
@@ -220,12 +213,6 @@ contract Float256Test is Test {
     	assertEq(Float256Math.fromUint(2401).root(4).toUint(), 7); // 7⁴ = 2401
 	}
 	
-	function testRootSpeed() public pure {
-		Float256 f = Float256Math.fromUint(145456445);
-		for (uint256 i = 0; i < 1000; i++) {
-    		f.root(4);
-    	}
-	}	
 	function testPowAndRootRoundtrip() public pure {
     	// pow → root should approximately recover original (for perfect powers)
     	uint256[] memory bases = new uint256[](5);
@@ -249,4 +236,64 @@ contract Float256Test is Test {
         	assertApproxEqUint(fourth.root(4).toUint(), b, 1, 10, "4th-root(pow(4)) roundtrip");
     	}
 	}	
+
+    function testSpeedAdd() public pure {
+        Float256 x = Float256Math.fromUint(1564513);
+        Float256 y = Float256Math.fromUint(3);
+        Float256 z = x;
+        uint256 zint = 1564513*3;
+	    // gas test for kflops
+        for (uint256 i = 0; i < 10; i++) {
+        	x = z;
+        	for (uint256 j= 0; j < 100; j++) {
+        		x = x.add(y);
+			}
+		}
+    }
+    function testSpeedSub() public pure {
+        Float256 x = Float256Math.fromUint(1564513);
+        Float256 y = Float256Math.fromUint(3);
+        Float256 z = x;
+        uint256 zint = 1564513*3;
+	    // gas test for kflops
+        for (uint256 i = 0; i < 10; i++) {
+        	x = z;
+        	for (uint256 j= 0; j < 100; j++) {
+        		x = x.sub(y);
+			}
+		}
+    }   
+    function testSpeedMul() public pure {
+        Float256 x = Float256Math.fromUint(1564513);
+        Float256 y = Float256Math.fromUint(3);
+        Float256 z = x;
+        uint256 zint = 1564513*3;
+	    // gas test for kflops
+        for (uint256 i = 0; i < 10; i++) {
+        	x = z;
+        	for (uint256 j= 0; j < 100; j++) {
+        		x = x.mul(y);
+			}
+		}
+    }
+    function testSpeedDiv() public pure {
+        Float256 x = Float256Math.fromUint(1564513);
+        Float256 y = Float256Math.fromUint(3);
+        Float256 z = x;
+        uint256 zint = 1564513*3;
+	    // gas test for kflops
+        for (uint256 i = 0; i < 10; i++) {
+        	x = z;
+        	for (uint256 j= 0; j < 100; j++) {
+        		x = x.div(y);
+			}
+		}
+    }    
+	function testSpeedRoot4() public pure {
+		Float256 f = Float256Math.fromUint(145456445);
+		for (uint256 i = 0; i < 1000; i++) {
+    		f.root(4);
+    	}
+	}	
+
 }

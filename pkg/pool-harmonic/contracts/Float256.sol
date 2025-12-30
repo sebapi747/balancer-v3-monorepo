@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
-
 /// @title Float — double precision packed into uint256
 type Float256 is uint256;
 library Float256Math {
@@ -236,18 +235,20 @@ library Float256Math {
         if (p == 4) { Float256 sq = mul(a, a); return mul(sq, sq); }
         revert("unsupported pow");
     }
-    
-    function sqrtInt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        //uint256 z = (x + 1) >> 1; 
-        uint256 z = 1 << ((_msb(x)+1) >> 1); // better educated guess
-        uint256 y = x;
-        while (z < y) {
-            y = z;
-            z = (x / z + z) >> 1;
-        }
-        return y;
-    }
+    	
+	function sqrtInt(uint256 x) internal pure returns (uint256) {
+    	if (x == 0) return 0;
+    	uint256 z = 1 << ((_msb(x) + 2) >> 1);   // educated guess 
+    	if (z>=x) {
+    		z -= 1;
+    	}
+    	uint256 y = x;
+    	while (z<y) {
+        	y = z;
+        	z = (x / z + z) >> 1;
+    	}
+    	return y;
+	}
     
     function root(Float256 ax, uint256 p) internal pure returns (Float256 c) {
         if (p == 1) return ax;
@@ -255,14 +256,14 @@ library Float256Math {
         require(p==2,"p must be 1,2 or 4");
         uint256 a = Float256.unwrap(ax);
         uint256 m = uint256(significand(a));
-        int256  exp = int256(exponent(a))-int256(EXPONENT_BIAS);
+        int256  exp = int256(exponent(a)+SIGNIFICAND_SCALE)-int256(EXPONENT_BIAS);
 		if (exp % 2 == 1) {
 			m = m << 1;
 			exp = exp-1;
 		}
 		uint256 SQRT_OFFSET = SIGNIFICAND_SCALE/2;
         m   = sqrtInt(m) << SQRT_OFFSET;
-        exp = (exp >> 1) - int256(SQRT_OFFSET) + int256(EXPONENT_BIAS);
+        exp = (exp >> 1) + int256(EXPONENT_BIAS-SIGNIFICAND_SCALE); // - int256(SQRT_OFFSET) 
         uint256 packed = pack(int256(m),uint256(exp));
     	return Float256.wrap(packed);
     }

@@ -150,4 +150,103 @@ contract Float256Test is Test {
         uint256 result = Float256Math.fromUint(x*y).div(Float256Math.fromUint(y)).toUint();
         assertApproxEqAbs(result, x, 1);
     }
+  
+    function testSqrtInt() public pure {
+    	// Perfect squares
+    	assertEq(Float256Math.sqrtInt(0), 0);
+    	assertEq(Float256Math.sqrtInt(1), 1);
+    	assertEq(Float256Math.sqrtInt(4), 2);
+    	assertEq(Float256Math.sqrtInt(9), 3);
+    	assertEq(Float256Math.sqrtInt(16), 4);
+    	assertEq(Float256Math.sqrtInt(25), 5);
+    	assertEq(Float256Math.sqrtInt(144), 12);
+    	assertEq(Float256Math.sqrtInt(1024), 32);
+    	assertEq(Float256Math.sqrtInt(65536), 256);
+    	assertEq(Float256Math.sqrtInt(100000000), 10000);
+	
+    	// Non-perfect squares → should floor
+    	assertEq(Float256Math.sqrtInt(2), 1);
+    	assertEq(Float256Math.sqrtInt(3), 1);
+    	assertEq(Float256Math.sqrtInt(8), 2);
+    	assertEq(Float256Math.sqrtInt(10), 3);
+    	assertEq(Float256Math.sqrtInt(15), 3);
+    	assertEq(Float256Math.sqrtInt(26), 5);
+    	assertEq(Float256Math.sqrtInt(99), 9);
+    	assertEq(Float256Math.sqrtInt(100000001), 10000);
+	
+    	// Larger values near uint256 bounds
+    	assertEq(Float256Math.sqrtInt(1 << 128), 1 << 64);
+    	assertEq(Float256Math.sqrtInt(1 << 200), 1 << 100);
+	}
+	
+	function testPowBasic() public pure {
+    	// p = 1 → should return the input unchanged
+    	assertEq(Float256Math.fromUint(7).pow(1).toUint(), 7);
+    	assertEq(Float256Math.fromUint(0).pow(1).toUint(), 0);
+    	assertEq(Float256Math.fromUint(1).pow(1).toUint(), 1);
+    	assertEq(Float256Math.fromUint(1000000).pow(1).toUint(), 1000000);
+	
+    	// p = 2 → square
+    	assertEq(Float256Math.fromUint(5).pow(2).toUint(), 25);
+    	assertEq(Float256Math.fromUint(10).pow(2).toUint(), 100);
+    	assertEq(Float256Math.fromUint(100).pow(2).toUint(), 10000);
+    	assertEq(Float256Math.fromUint(0).pow(2).toUint(), 0);
+	
+    	// p = 4 → square of square
+    	assertEq(Float256Math.fromUint(3).pow(4).toUint(), 81);
+    	assertEq(Float256Math.fromUint(4).pow(4).toUint(), 256);
+    	assertEq(Float256Math.fromUint(10).pow(4).toUint(), 10000);
+	}
+	
+	function testRootBasic() public pure {
+    	// p = 1 → identity
+    	assertEq(Float256Math.fromUint(42).root(1).toUint(), 42);
+    	assertEq(Float256Math.fromUint(0).root(1).toUint(), 0);
+    	assertEq(Float256Math.fromUint(1).root(1).toUint(), 1);
+	
+    	// p = 2 → square root (floors)
+    	assertEq(Float256Math.fromUint(16).root(2).toUint(), 4);
+    	assertEq(Float256Math.fromUint(25).root(2).toUint(), 5);
+    	assertEq(Float256Math.fromUint(26).root(2).toUint(), 5); // floors
+    	assertEq(Float256Math.fromUint(9).root(2).toUint(), 3);
+    	assertEq(Float256Math.fromUint(2).root(2).toUint(), 1);
+    	assertEq(Float256Math.fromUint(0).root(2).toUint(), 0);
+    	
+    	// p = 4 → fourth root = sqrt(sqrt(x))
+    	assertEq(Float256Math.fromUint(81).root(4).toUint(), 3);
+    	assertEq(Float256Math.fromUint(256).root(4).toUint(), 4);
+    	assertEq(Float256Math.fromUint(625).root(4).toUint(), 5);
+    	assertEq(Float256Math.fromUint(10000).root(4).toUint(), 10);
+    	assertEq(Float256Math.fromUint(2401).root(4).toUint(), 7); // 7⁴ = 2401
+	}
+	
+	function testRootSpeed() public pure {
+		Float256 f = Float256Math.fromUint(145456445);
+		for (uint256 i = 0; i < 1000; i++) {
+    		f.root(4);
+    	}
+	}	
+	function testPowAndRootRoundtrip() public pure {
+    	// pow → root should approximately recover original (for perfect powers)
+    	uint256[] memory bases = new uint256[](5);
+    	bases[0] = 2;
+    	bases[1] = 3;
+    	bases[2] = 5;
+    	bases[3] = 10;
+    	bases[4] = 16;
+	
+    	for (uint256 i = 0; i < bases.length; i++) {
+        	uint256 b = bases[i];
+	
+        	Float256 f = Float256Math.fromUint(b);
+	
+        	// b² → √ → should get back b (or very close)
+        	Float256 sq = f.pow(2);
+        	assertApproxEqUint(sq.root(2).toUint(), b, 1, 10, "sqrt(pow(2)) roundtrip");
+	
+        	// b⁴ → ⁴√ → should get back b
+        	Float256 fourth = f.pow(4);
+        	assertApproxEqUint(fourth.root(4).toUint(), b, 1, 10, "4th-root(pow(4)) roundtrip");
+    	}
+	}	
 }

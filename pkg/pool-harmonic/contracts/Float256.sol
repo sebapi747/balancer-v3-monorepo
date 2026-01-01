@@ -62,7 +62,7 @@ library Float256Math {
     uint256 public constant MASK_SIGNIFICAND = 0x000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF; // bits 243–0
     uint256 public constant MASK_SIGNED_SIGNIFICAND = 0x001FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF; //  
     uint256 public constant SIGNIFICAND_SCALE = 72; // significand normalization shift 
-    uint256 public constant SQRT_OFFSET = 36; //used by root(); it's exponent logic assumes that SIGNIFICAND_SCALE is an odd
+    uint256 public constant SQRT_OFFSET = 36; // root() function square halving assumes that SIGNIFICAND_SCALE is even
 
     /// @dev Convert uint256 → Float256 (rounds to nearest, ties to even)
     function fromUint(uint256 x) internal pure returns (Float256) {

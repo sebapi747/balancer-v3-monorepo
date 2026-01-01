@@ -20,8 +20,9 @@ contract HarmonicPoolFactory is BasePoolFactory {
     function create(
         string memory name,
         string memory symbol,
-        IERC20[] memory tokens,
+        IERC20[] calldata tokens,
         uint256 p,
+        uint256[] calldata alphas,
         string memory version
     ) external returns (address pool) {
         HarmonicPool.NewPoolParams memory params = HarmonicPool.NewPoolParams({
@@ -29,6 +30,7 @@ contract HarmonicPoolFactory is BasePoolFactory {
             symbol: symbol,
             tokens: tokens,
             p: p,
+            alphas: alphas,
             version: version
         });
 

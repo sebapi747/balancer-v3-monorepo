@@ -1,6 +1,7 @@
 # CHMM (Constant Harmonic Market Maker) Summary
 
 **Core Concept**: New CFMM variant that generalizes CPMM using harmonic mean of inverse powers to reduce impermanent loss.
+Only **p = 1, 2, 4** are supported for gas efficiency, simplicity, and reliable numerical behavior.
 
 **Key Equations**:
 1. **Binding Function**: `∑ γᵢ/Qᵢᵖ = constant` where `γᵢ = αᵢᵖ⁺¹/Xᵢ(0)ᵖ`
@@ -14,8 +15,8 @@
 **Implementation Notes**:
 - **Fixed-point issues**: Initially tried 10¹⁸ scaling (standard DeFi) but caused underflow for p=4  
   - Reduced to 10⁶ scaling works but loses precision (too approximative for real use)
-- **Solution**: Created `FloatRepBinary` custom 80-bit float (mantissa:int64, exponent:int16)
-- Binary base for efficiency: `value = mantissa × 2^exponent`
+- **Solution**: Created `Float256` custom 256-bit float (signed significand:int244, exponent:uint11)
+- Binary base for efficiency: `value = significand × 2^{exponent-bias}`
 - Only used in swap computation for numerical stability
 
 **Classes**:
@@ -31,13 +32,13 @@ pkg/pool-harmonic/
 │   ├── HarmonicPool.sol                 ← main pool (template: WeightedPool.sol)
 │   ├── HarmonicPoolFactory.sol          ← factory (template: WeightedPoolFactory.sol)
 │   ├── HarmonicMath.sol                 ← all CHMM math + swap formulas
-│   └── FloatRepBinary.sol               ← custom 80-bit float struct + ops
+│   └── Float256.sol               		 ← performance 256bit floating point library 
 │
 ├── test/
 │   └── foundry/
 │       ├── HarmonicPool.t.sol           ← full pool tests
 │       ├── HarmonicMath.t.sol           ← pure math tests
-│       ├── FloarRepBinary.t.sol         ← pure float point math test
+│       ├── Float256.t.sol               ← pure float point math test
 │       └── utils/
 │           └── HarmonicPoolDeployer.sol ← deployment helper
 │

@@ -11,8 +11,13 @@ contract HarmonicPoolDeployer {
         IERC20[] memory tokens,
         uint256 p
     ) external returns (HarmonicPool) {
+		uint256[] memory weights = new uint256[](tokens.length);
+        uint256 equalWeight = 1e18 / tokens.length;   // e.g. 0.5e18 for 2 tokens
+        for (uint256 i = 0; i < tokens.length; i++) {
+            weights[i] = equalWeight;
+        }
 		return HarmonicPool(
-    		factory.create("Harmonic Pool", "HARM", tokens, p, "1.0.0")
+    		factory.create("Harmonic Pool", "HARM", tokens, p, weights, "1.0.0")
 		);
     }
 }

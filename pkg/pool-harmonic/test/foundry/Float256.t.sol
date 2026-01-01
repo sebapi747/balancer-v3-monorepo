@@ -51,6 +51,7 @@ contract Float256Test is Test {
 		debugUint256Bits(" +28 packed:", Float256.unwrap(pos28));*/
     	//debugUint256Bits("-13 manual :", Float256.unwrap(neg13));
     	Float256 zero = pos13.add(neg13);
+		//debugUint256Bits(" 1e18 packed:", Float256.unwrap(Float256Math.fromUint(1e18)));
     	//debugUint256Bits("0 zero:", Float256.unwrap(zero));
         assertEq(zero.toUint(),0);
         assertEq(pos13.add(pos15).toUint(),28);

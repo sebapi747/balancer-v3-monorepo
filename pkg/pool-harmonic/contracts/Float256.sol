@@ -63,7 +63,7 @@ library Float256Math {
     uint256 public constant MASK_SIGNED_SIGNIFICAND = 0x001FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF; //  
     uint256 public constant SIGNIFICAND_SCALE = 72; // significand normalization shift 
     uint256 public constant SQRT_OFFSET = 36; // root() function square halving assumes that SIGNIFICAND_SCALE is even
-
+	uint256 public constant packed1e18 = 57104497133637381532132175224011126431544279547020004726494312425777471160320; // Float256.unwrap(Float256Math.fromUint(1e18))
     /// @dev Convert uint256 → Float256 (rounds to nearest, ties to even)
     function fromUint(uint256 x) internal pure returns (Float256) {
         if (x==0) return Float256.wrap(0);
@@ -88,7 +88,14 @@ library Float256Math {
                 : usig>>(EXPONENT_BIAS-exp);
         }
     }
-
+    
+    function fromUint18(uint256 x) internal pure returns (Float256) {
+    	return div(fromUint(x),Float256.wrap(packed1e18));
+    }
+    function toUint18(Float256 f) internal pure returns (uint256) {
+    	return toUint(mul(f,Float256.wrap(packed1e18)));
+    }
+    
 	/// @dev Fast MSB position for uint256 (~60 gas for 2024–2026 EVM)
     function _msb(uint256 x) private pure returns (uint256 r) {
         if (x == 0) return 0;

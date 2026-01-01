@@ -57,8 +57,7 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
             		request.indexIn,
             		request.indexOut,
             		Float256Math.fromUint18(request.amountGivenScaled18),           // δQi > 0
-            		request.balancesScaled18
-        		);
+            		request.balancesScaled18);
         		return Float256Math.toUint18(deltaOut);
     		} else {
         		// EXACT_OUT: remove amountGiven from tokenOut → compute amount added to tokenIn
@@ -66,8 +65,7 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
             		request.indexIn,
             		request.indexOut,
             		Float256Math.fromUint18(request.amountGivenScaled18),           // δQj > 0
-            		request.balancesScaled18
-        		);
+            		request.balancesScaled18);
         		return Float256Math.toUint18(deltaIn);
     		}
     }
@@ -123,6 +121,9 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
 	// ─────────────────────────────────────────────────────────────
 	// Internal helpers — each has very few locals → no stack-too-deep
 	// ─────────────────────────────────────────────────────────────
+    //  **Swap Formula** (θ-version, scale-invariant):  
+   	//	With `Q̃ᵢ = θᵢ/Qᵢ`:  
+   	//	`δQᵢ = θᵢ × (αᵢ/(αᵢQ̃ᵢᵖ + αⱼ(Q̃ⱼᵖ - Q̃ⱼ'ᵖ)))¹/ᵖ - Qᵢ` where `Q̃ⱼ' = θⱼ/(Qⱼ+δQⱼ)`
 	function _computeDeltaOut(
     	uint256 i,
     	uint256 j,
@@ -133,9 +134,6 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     	Float256 aj      = Float256.wrap(thetas[j]); // typo fix: was alphas[j]
     	Float256 thetai  = Float256.wrap(thetas[i]);
     	Float256 thetaj  = Float256.wrap(thetas[j]);
-    	//  **Swap Formula** (θ-version, scale-invariant):  
-   		//	With `Q̃ᵢ = θᵢ/Qᵢ`:  
-   		//	`δQᵢ = θᵢ × (αᵢ/(αᵢQ̃ᵢᵖ + αⱼ(Q̃ⱼᵖ - Q̃ⱼ'ᵖ)))¹/ᵖ - Qᵢ` where `Q̃ⱼ' = θⱼ/(Qⱼ+δQⱼ)`
     	Float256 Qi   = thetai.div(Float256Math.fromUint18(balancesScaled18[i]));
     	Float256 Qj   = thetaj.div(Float256Math.fromUint18(balancesScaled18[j]));
     	Float256 QiNew = Qi.add(deltaQi);               // Qi + δQi

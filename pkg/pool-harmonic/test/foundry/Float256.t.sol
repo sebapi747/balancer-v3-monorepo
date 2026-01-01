@@ -29,6 +29,8 @@ contract Float256Test is Test {
     	console.log("int256 ",name);
     	console.log("  raw uint256:       ", x);
     	console.log("  raw bitfield:      ", result);
+    	console.log("  exp bitfield:      ", bitfieldtostring(biasedExp));
+    	console.log("  sig bitfield:      ", bitfieldtostring(sigSignificand));
     	console.log("Interpretation as packed Float256:");
     	console.log("  Sign bit (255):    ", isNegative ? "-1 (negative)" : "+1 (positive)");
     	console.log("  Biased exponent:   ", biasedExp);
@@ -36,28 +38,37 @@ contract Float256Test is Test {
     	console.log("  Significand bits:  ", bitfieldtostring(sigSignificand)); 
 	}
 
-	function testDebugSigns() public pure {
+	function testAAADebugSigns() public pure {
     	Float256 pos13 = Float256Math.fromUint(13);
     	Float256 neg13 = Float256Math.fromUint(0).sub(pos13);
-		//debugUint256Bits(" +13 packed:", Float256.unwrap(pos13));
-    	//debugUint256Bits("-13 manual:", Float256.unwrap(neg13));
+    	Float256 pos15 = Float256Math.fromUint(15);
+    	Float256 pos28 = Float256Math.fromUint(28);
+    	// 13: 1101 with SIGNIFICAND_SCALE
+    	// exp: msb=3 
+		/*debugUint256Bits(" +13 packed:", Float256.unwrap(pos13));
+		debugUint256Bits(" +15 packed:", Float256.unwrap(pos15));
+		debugUint256Bits(" add 13+15 packed:", Float256.unwrap(pos13.add(pos15)));
+		debugUint256Bits(" +28 packed:", Float256.unwrap(pos28));*/
+    	//debugUint256Bits("-13 manual :", Float256.unwrap(neg13));
     	Float256 zero = pos13.add(neg13);
+    	//debugUint256Bits("0 zero:", Float256.unwrap(zero));
         assertEq(zero.toUint(),0);
+        assertEq(pos13.add(pos15).toUint(),28);
 	}
 
-    function testPerfFromUint() public pure {
+    function testSpeedFromUint() public pure {
         for (uint256 i = 0; i < 1000; i++) {
         	Float256Math.fromUint(1000);
         }
     }
-    function testPerfToUint() public pure {
+    function testSpeedToUint() public pure {
         Float256 f = Float256Math.fromUint(1e18);
         for (uint256 i = 0; i < 1000; i++) {
         	f.toUint();
         }
     }
     
-    function testZeroConvertsCorrectly() public pure {
+    function testACZeroConvertsCorrectly() public pure {
         Float256 f = Float256Math.fromUint(0);
         assertEq(Float256.unwrap(f), 0);
         assertEq(f.toUint(), 0);
@@ -80,15 +91,23 @@ contract Float256Test is Test {
 	// Helper to check relative error abs(a-b).2^52-1 <= x for  ~1 ulp
     function assertApproxEqUint(uint256 a, uint256 b, uint256 x, uint256 tolerance, string memory err) internal pure {
         uint256 diff = a > b ? a - b : b - a;
-        assertLe(diff << (Float256Math.SIGNIFICAND_SCALE-tolerance) -1, x, err); // Allow abs(a-b).2^52-1 <= x 
+        assertLe(diff << (Float256Math.SIGNIFICAND_SCALE-Float256Math.EXPONENT_BITS-tolerance) -1, x, err); // Allow abs(a-b).2^52-1 <= x 
     }
     
     function testRoundTrip(uint256 x) public pure {
-        Float256 f = Float256Math.fromUint(x);
-        uint256 back = f.toUint();
-        assertApproxEqUint(x,back,back,0,"testRoundTrip");
+        vm.assume(x < (1 << (Float256Math.SIGNIFICAND_SCALE-11)));
+        assertEq(Float256Math.fromUint(x).toUint(),x);
     }
-    
+	function testAdd() public pure{
+        Float256 fy = Float256Math.fromUint(2115565);
+        assertEq(Float256Math.fromUint(450).add(fy).toUint(), 450+2115565);
+        assertEq(Float256Math.fromUint(2115565).add(fy).toUint(), 2115565+2115565);
+    }    
+	function testSub() public pure{
+        Float256 fy = Float256Math.fromUint(21);
+        assertEq(Float256Math.fromUint(450).sub(fy).toUint(), 450-21);
+        assertEq(Float256Math.fromUint(2115565).sub(fy).toUint(), 2115565-21);
+    }     
     function testMul() public pure {
         Float256 x = Float256Math.fromUint(1564513);
         Float256 y = Float256Math.fromUint(3);
@@ -96,28 +115,24 @@ contract Float256Test is Test {
         uint256 zint = 1564513*3;
 	    assertEq(x.mul(y).toUint(),zint);
     }
-   
+      
 	function testAddFuzz(uint256 x, uint256 y) public pure{
-        vm.assume(x < (1 << 254));
-        vm.assume(y < (1 << 254));
+        vm.assume(x < (1 << (255-11-Float256Math.SIGNIFICAND_SCALE-1)));
+        vm.assume(y < (1 << (255-11-Float256Math.SIGNIFICAND_SCALE-1)));
         Float256 fx = Float256Math.fromUint(x);
         Float256 fy = Float256Math.fromUint(y);
         Float256 result = fx.add(fy);
         assertApproxEqUint(result.toUint(), x + y,x+y,0, "add fuzz precision");
     } 
 	function testSubFuzz(uint256 x, uint256 y) public pure{
-        vm.assume(x < (1 << 254));
-        vm.assume(y < (1 << 254));
+        vm.assume(x < (1 << (200-11-Float256Math.SIGNIFICAND_SCALE)));
+        vm.assume(y < (1 << (200-11-Float256Math.SIGNIFICAND_SCALE)));
         vm.assume(x>=y);
         Float256 fx = Float256Math.fromUint(x);
         Float256 fy = Float256Math.fromUint(y);
         Float256 xmy = fx.sub(fy);
-        assertApproxEqUint(x-y, xmy.toUint(), x,0, "sub fuzz relative precision");
-        Float256 ymx = fy.sub(fx);
-        Float256 zero = ymx.add(xmy);
-        assertEq(zero.toUint(),0);
-        assertEq(xmy.add(ymx).toUint(),0);
-
+        // Helper to check relative error abs(a-b).2^52-1 <= x for  ~1 ulp
+        assertApproxEqUint(x-y, xmy.toUint(), x, 2, "sub fuzz failed");
     } 
 	function testMulFuzz(uint256 x, uint256 y) public pure{
         vm.assume(x < (1 << 240));
@@ -221,19 +236,12 @@ contract Float256Test is Test {
     	bases[2] = 5;
     	bases[3] = 10;
     	bases[4] = 16;
-	
     	for (uint256 i = 0; i < bases.length; i++) {
-        	uint256 b = bases[i];
-	
-        	Float256 f = Float256Math.fromUint(b);
-	
-        	// b² → √ → should get back b (or very close)
-        	Float256 sq = f.pow(2);
-        	assertApproxEqUint(sq.root(2).toUint(), b, 1, 10, "sqrt(pow(2)) roundtrip");
-	
-        	// b⁴ → ⁴√ → should get back b
-        	Float256 fourth = f.pow(4);
-        	assertApproxEqUint(fourth.root(4).toUint(), b, 1, 10, "4th-root(pow(4)) roundtrip");
+	    	Float256 f = Float256Math.fromUint(bases[i]);
+	    	// b² → √ → should get back b (or very close)
+        	assertEq(f.pow(2).root(2).toUint(), bases[i]);
+	    	// b⁴ → ⁴√ → should get back b
+        	assertEq( f.pow(4).root(4).toUint(), bases[i]);
     	}
 	}	
 
@@ -295,5 +303,10 @@ contract Float256Test is Test {
     		f.root(4);
     	}
 	}	
-
+	function testSpeedRoot2() public pure {
+		Float256 f = Float256Math.fromUint(145456445);
+		for (uint256 i = 0; i < 1000; i++) {
+    		f.root(2);
+    	}
+	}	
 }

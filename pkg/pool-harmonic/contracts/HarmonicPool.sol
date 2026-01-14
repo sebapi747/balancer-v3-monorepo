@@ -34,7 +34,6 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
 	uint256 private p;
     uint256[] private alphas;     // set at construction
     uint256[] private thetas;       // set once, during first join
-	bool private thetasInitialized;  
 	IVault private immutable vault;
 	
     error HarmonicPoolBptRateUnsupported();
@@ -57,7 +56,7 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     	if (msg.sender != address(vault)) {
         	revert("Only Vault can initialize thetas");
     	}
-    	if (thetasInitialized) {
+    	if (thetas.length!=0) {
         	revert("Thetas already initialized");
     	}
     	uint256 len = initialBalancesScaled18.length;
@@ -65,17 +64,16 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
         	revert("Invalid balances length");
     	}
     	thetas = new uint256[](len);
-    	// Set theta_i = alpha_i / Q_i(0)   →   theta_i = alpha_i * Q_i(0)
-    	// (since later we use Q̃_i = theta_i / Q_i  →  alpha_i / Q_i(0) / Q_i = alpha_i / (Q_i(0) * Q_i))
-    	Float256 Q1 = Float256Math.fromUint18(initialBalancesScaled18[0]);
+    	// theta_i = alpha_1/Q_1(0) * Q_i(0)
+    	// alpha_1/Q1
+    	Float256 a1q1 = Float256.wrap(alphas[0]).div(Float256Math.fromUint18(initialBalancesScaled18[0]));
     	for (uint256 i = 0; i < len; ++i) {
         	if (initialBalancesScaled18[i] == 0) {
             	revert("Cannot initialize with zero balance");
         	}
-        	// theta_i = alpha_i * (Qi/Q1)
-        	thetas[i] = Float256.unwrap(Float256.wrap(alphas[i]).mul(Float256Math.fromUint18(initialBalancesScaled18[i]).div(Q1)));
+        	// theta_i = alpha_1/Q1 * Qi
+        	thetas[i] = Float256.unwrap(a1q1.mul(Float256Math.fromUint18(initialBalancesScaled18[i])));
     	}
-    	thetasInitialized = true;
 	}
 
     /// @inheritdoc IBasePool

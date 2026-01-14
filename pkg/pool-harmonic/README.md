@@ -2,6 +2,19 @@
 
 **Core Concept**: New CFMM variant that generalizes CPMM using harmonic mean of inverse powers to reduce impermanent loss.
 Only **p = 1, 2, 4** are supported for gas efficiency, simplicity, and reliable numerical behavior.
+This is a minimal fork on balancer-v3-monorepo.
+
+This implementation is based on the theory presented in: "Multi-Asset Constant Harmonic Market Maker" mchmm.pdf.
+
+## Theoretical Foundation
+
+The CHMM invariant ∑ γᵢ/Qᵢᵖ = constant provides:
+- **Ruin protection**: Qᵢ → k > 0 as Xᵢ → 0
+- **Unlimited upside**: Full exposure to appreciating assets
+- **Dynamic rebalancing**: Portfolio weights wᵢ = aᵢXᵢᵐ/∑aⱼXⱼᵐ
+
+See mchmm.pdf Sections 2-4 for detailed derivations.
+
 
 **Key Equations**:
 1. **Binding Function**: `∑ γᵢ/Qᵢᵖ = constant` where `γᵢ = αᵢᵖ⁺¹/Xᵢ(0)ᵖ`
@@ -19,25 +32,18 @@ Only **p = 1, 2, 4** are supported for gas efficiency, simplicity, and reliable 
 - Binary base for efficiency: `value = significand × 2^{exponent-bias}`
 - Only used in swap computation for numerical stability
 
-**Classes**:
-- python `CHMM`: Base with float64 numpy
-- python `CHMMFloatRepBinary`: Uses custom float for swaps
-- python `FloatRepBinary`: Minimal float struct for on-chain efficiency. 
-   The python implementation has two int but is not optimized yet.
-
-**Purpose**: Tunable AMM where parameter `p` interpolates between CPMM (p→0) and HODL (p→∞).
+**Purpose**: Tunable AMM where parameter `m = p/(p+1)` interpolates between CPMM (m→0, p→0) and HODL (m→1, p→∞).
+In practice, we plan to use p=1 (m=0.5) or p=4 (m=0.8).
 
 pkg/pool-harmonic/
 ├── contracts/
 │   ├── HarmonicPool.sol                 ← main pool (template: WeightedPool.sol)
 │   ├── HarmonicPoolFactory.sol          ← factory (template: WeightedPoolFactory.sol)
-│   ├── HarmonicMath.sol                 ← all CHMM math + swap formulas
 │   └── Float256.sol               		 ← performance 256bit floating point library 
 │
 ├── test/
 │   └── foundry/
 │       ├── HarmonicPool.t.sol           ← full pool tests
-│       ├── HarmonicMath.t.sol           ← pure math tests
 │       ├── Float256.t.sol               ← pure float point math test
 │       └── utils/
 │           └── HarmonicPoolDeployer.sol ← deployment helper

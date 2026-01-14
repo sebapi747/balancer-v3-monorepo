@@ -13,8 +13,7 @@ import "@balancer-labs/v3-interfaces/contracts/vault/VaultTypes.sol";
 import { BalancerPoolToken } from "@balancer-labs/v3-vault/contracts/BalancerPoolToken.sol";
 import { PoolInfo } from "@balancer-labs/v3-pool-utils/contracts/PoolInfo.sol";
 import { Version } from "@balancer-labs/v3-solidity-utils/contracts/helpers/Version.sol";
-import { Float256, Float256Math } from "./Float256.sol"; // Adjust the path if needed
-import { HarmonicMath } from "./HarmonicMath.sol";
+import { Float256, Float256Math } from "./Float256.sol"; 
 
 contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     using Float256Math for Float256;
@@ -30,23 +29,54 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
 
     uint256 private constant _MIN_SWAP_FEE_PERCENTAGE = 0.001e16; // 0.001%
     uint256 private constant _MAX_SWAP_FEE_PERCENTAGE = 10e16;    // 10%
-
+	uint256 private constant _MIN_INVARIANT_RATIO =  9e16;
+	uint256 private constant _MAX_INVARIANT_RATIO = 11e16;
 	uint256 private p;
     uint256[] private alphas;     // set at construction
     uint256[] private thetas;       // set once, during first join
-
+	bool private thetasInitialized;  
+	IVault private immutable vault;
+	
     error HarmonicPoolBptRateUnsupported();
 
-    constructor(NewPoolParams memory params, IVault vault)
-        BalancerPoolToken(vault, params.name, params.symbol)
-        PoolInfo(vault)
+    constructor(NewPoolParams memory params, IVault _vault)
+        BalancerPoolToken(_vault, params.name, params.symbol)
+        PoolInfo(_vault)
         Version(params.version)
     {
         // Vault already validates token count, but we keep the check for clarity
+        vault = _vault;  
         InputHelpers.ensureInputLengthMatch(params.tokens.length, params.alphas.length);
         p = params.p;
         alphas = params.alphas;
     }
+
+	// ─────────────────────────────────────────────────────────────
+	// Init logic (called by the Vault during first join)
+	function setThetasOnce(uint256[] memory initialBalancesScaled18) external {
+    	if (msg.sender != address(vault)) {
+        	revert("Only Vault can initialize thetas");
+    	}
+    	if (thetasInitialized) {
+        	revert("Thetas already initialized");
+    	}
+    	uint256 len = initialBalancesScaled18.length;
+    	if (len != alphas.length) {
+        	revert("Invalid balances length");
+    	}
+    	thetas = new uint256[](len);
+    	// Set theta_i = alpha_i / Q_i(0)   →   theta_i = alpha_i * Q_i(0)
+    	// (since later we use Q̃_i = theta_i / Q_i  →  alpha_i / Q_i(0) / Q_i = alpha_i / (Q_i(0) * Q_i))
+    	Float256 Q1 = Float256Math.fromUint18(initialBalancesScaled18[0]);
+    	for (uint256 i = 0; i < len; ++i) {
+        	if (initialBalancesScaled18[i] == 0) {
+            	revert("Cannot initialize with zero balance");
+        	}
+        	// theta_i = alpha_i * (Qi/Q1)
+        	thetas[i] = Float256.unwrap(Float256.wrap(alphas[i]).mul(Float256Math.fromUint18(initialBalancesScaled18[i]).div(Q1)));
+    	}
+    	thetasInitialized = true;
+	}
 
     /// @inheritdoc IBasePool
     function onSwap(PoolSwapParams memory request) public view virtual override returns (uint256) {
@@ -70,19 +100,26 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     		}
     }
 
-    /// @inheritdoc IBasePool
-    function computeInvariant(uint256[] memory balancesLiveScaled18, Rounding rounding)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        function(uint256[] memory, uint256) internal pure returns (uint256) fn = rounding == Rounding.ROUND_UP
-            ? HarmonicMath.computeInvariantUp
-            : HarmonicMath.computeInvariantDown;
-
-        return fn(balancesLiveScaled18, p);
-    }
+	function computeInvariant(
+    	uint256[] memory balancesLiveScaled18,
+    	Rounding rounding
+	) public view override returns (uint256) {
+    	Float256 sum = Float256.wrap(0);
+    	uint256 len = balancesLiveScaled18.length;
+	
+    	for (uint256 i = 0; i < len; ++i) {
+        	Float256 theta = Float256.wrap(thetas[i]);
+        	Float256 bal = Float256Math.fromUint18(balancesLiveScaled18[i]);
+        	Float256 ratio = theta.div(bal);
+        	Float256 term = Float256.wrap(alphas[i]).mul(ratio.pow(p));
+        	sum = sum.add(term);
+    	}
+    	uint256 invariant = Float256Math.toUint18(sum);
+    	if (rounding == Rounding.ROUND_UP) {
+        	invariant += 1;
+    	}
+    	return invariant;
+	}    
 
     /// @inheritdoc IBasePool
     function computeBalance(
@@ -106,11 +143,11 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     }
 
     function getMinimumInvariantRatio() external pure returns (uint256) {
-        return HarmonicMath._MIN_INVARIANT_RATIO;
+        return _MIN_INVARIANT_RATIO;
     }
 
     function getMaximumInvariantRatio() external pure returns (uint256) {
-        return HarmonicMath._MAX_INVARIANT_RATIO;
+        return _MAX_INVARIANT_RATIO;
     }
 
     /// @inheritdoc IRateProvider

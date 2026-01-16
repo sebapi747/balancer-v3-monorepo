@@ -166,7 +166,7 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     	uint256[] memory balancesScaled18
 	) private view returns (Float256 deltaQj) {
     	Float256 ai      = Float256.wrap(alphas[i]);
-    	Float256 aj      = Float256.wrap(thetas[j]); // typo fix: was alphas[j]
+    	Float256 aj      = Float256.wrap(alphas[j]); 
     	Float256 thetai  = Float256.wrap(thetas[i]);
     	Float256 thetaj  = Float256.wrap(thetas[j]);
     	Float256 Qi   = thetai.div(Float256Math.fromUint18(balancesScaled18[i]));
@@ -197,12 +197,12 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     	Float256 aj,
     	Float256 thetai,
     	Float256 thetaj) private view returns (Float256 QjNew) {
-    	Float256 Qti   = thetai.div(Qi);
-    	Float256 QtiNew = thetai.div(QiNew);
-    	Float256 Qtj   = thetaj.div(Qj);
+    	Float256 Qti     = thetai.div(Qi);
+    	Float256 QtiNew  = thetai.div(QiNew);
+    	Float256 Qtj     = thetaj.div(Qj);
     	Float256 diffPow = Qti.pow(p).sub(QtiNew.pow(p));
-    	Float256 denom = ai.mul(diffPow).add(aj.mul(Qtj.pow(p)));
-    	Float256 inner = aj.div(denom);           // αⱼ / denom
+    	Float256 denom   = ai.mul(diffPow).add(aj.mul(Qtj.pow(p)));
+    	Float256 inner   = aj.div(denom);         // αⱼ / denom
     	QjNew = thetaj.mul(inner.root(p));        // θⱼ × (…)^{1/p}
 	}   
 }

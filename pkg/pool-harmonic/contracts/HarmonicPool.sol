@@ -36,6 +36,10 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
     uint256[] private thetas;       // set once, during first join
 	IVault private immutable vault;
 	
+	function getP() external view returns (uint256) { return p; }
+	function getAlphas() external view returns (uint256[] memory) {return alphas;}
+	function getThetas() external view returns (uint256[] memory) {return thetas;}
+	
     error HarmonicPoolBptRateUnsupported();
 
     constructor(NewPoolParams memory params, IVault _vault)
@@ -120,13 +124,47 @@ contract HarmonicPool is BalancerPoolToken, PoolInfo, Version, IBasePool {
 	}    
 
     /// @inheritdoc IBasePool
-    function computeBalance(
-        uint256[] memory balancesLiveScaled18,
-        uint256 tokenInIndex,
-        uint256 invariantRatio
-    ) external view override returns (uint256) {
-        return p;
-    }
+	function computeBalance(
+    	uint256[] memory balancesLiveScaled18,
+    	uint256 tokenIndex,
+    	uint256 invariantRatio
+	) external view override returns (uint256) {
+    	// New invariant = old invariant × invariantRatio
+    	// We want to find new balance at tokenIndex that keeps the invariant constant
+    	// after changing only that one balance
+    	uint256 len = balancesLiveScaled18.length;
+    	Float256 targetInvariant = Float256Math.fromUint18(computeInvariant(balancesLiveScaled18, Rounding.ROUND_DOWN))
+        	.mul(Float256Math.fromUint18(invariantRatio));
+    	// 1. Compute contribution of all tokens EXCEPT the target one
+    	Float256 sumOthers = Float256.wrap(0);
+    	for (uint256 i = 0; i < len; ++i) {
+        	if (i == tokenIndex) continue;
+        	Float256 theta = Float256.wrap(thetas[i]);
+        	Float256 bal   = Float256Math.fromUint18(balancesLiveScaled18[i]);
+        	Float256 ratio = theta.div(bal);
+        	Float256 term  = Float256.wrap(alphas[i]).mul(ratio.pow(p));
+        	sumOthers = sumOthers.add(term);
+    	}
+	
+    	// 2. The remaining part must come from the target token
+    	Float256 targetTerm = targetInvariant.sub(sumOthers);
+	
+    	// 3. targetTerm = alpha_target × (theta_target / new_balance)^p
+    	// => (theta_target / new_balance)^p = targetTerm / alpha_target
+    	// => theta_target / new_balance = (targetTerm / alpha_target)^{1/p}
+    	// => new_balance = theta_target / (targetTerm / alpha_target)^{1/p}
+    	Float256 alphaTarget = Float256.wrap(alphas[tokenIndex]);
+    	Float256 thetaTarget = Float256.wrap(thetas[tokenIndex]);
+    	if (Float256Math.significand(Float256.unwrap(targetTerm)) <= 0) {
+        	// Should never happen in normal operation (would mean impossible state)
+        	revert("HarmonicPool: invalid target term");
+    	}
+	
+    	Float256 inner = targetTerm.div(alphaTarget);
+    	Float256 ratioNew = inner.root(p);               // ^{1/p}
+    	Float256 newBalance = thetaTarget.div(ratioNew);
+    	return Float256Math.toUint18(newBalance);
+	}
 
     // ─────────────────────────────────────────────────────────────
     // Interface implementations (no @inheritdoc needed if no base contract implements them)

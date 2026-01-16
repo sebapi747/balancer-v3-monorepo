@@ -139,8 +139,7 @@ library Float256Math {
         assembly {packed := or(shr(EXPONENT_BITS,cs), shl(EXPONENT_SHIFT, ce))} 
     }
     
-    // ────────────────────────────── Arithmetic ──────────────────────────────
-    
+    // ────────────────────────────── Arithmetic ──────────────────────────────       
     function add(Float256 ax, Float256 bx) internal pure returns (Float256) {
         uint256 a = Float256.unwrap(ax);
         uint256 b = Float256.unwrap(bx);

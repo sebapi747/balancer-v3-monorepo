@@ -82,26 +82,24 @@ contract HarmonicPoolTest is Test {
 	
     	factory = new HarmonicPoolFactory(IVault(address(this)), 90 days);
 	
+    	uint256[] memory _alphas = new uint256[](2);
+    	_alphas[0] = 5e17;
+    	_alphas[1] = 5e17;
+    		
     	address poolAddr = factory.create(
         	"Harmonic 50/50",
         	"HARM-50",
         	tokens,
         	2,                      // p=2
-        	new uint256[](2),       // will set below
+        	_alphas,       // will set below
         	"test-v1"
     	);
     	pool = HarmonicPool(poolAddr);
 	
-    	uint256[] memory _alphas = new uint256[](2);
-    	_alphas[0] = 5e17;
-    	_alphas[1] = 5e17;
-	
     	// Note: factory.create should accept alphas as calldata parameter
     	// If your factory signature is different, adjust accordingly
-	
     	tokenA.mint(address(this), 50_000 ether);
     	tokenB.mint(address(this), 50_000 ether);
-	
     	tokenA.approve(address(this), type(uint256).max); // if needed
     	tokenB.approve(address(this), type(uint256).max);
 	}
